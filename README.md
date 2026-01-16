@@ -61,7 +61,7 @@
 
 ### 方式一：下载预编译版本
 
-从 [Releases](../../releases) 页面下载最新的 `triple-net-fixer.exe`，右键以管理员身份运行。
+从 [Releases](../../releases) 页面下载最新的 `route-split.exe`，右键以管理员身份运行。
 
 ### 方式二：从源码编译
 
@@ -74,7 +74,7 @@ cd route-split
 cargo build --release
 
 # 运行（需要管理员权限）
-./target/release/triple-net-fixer.exe
+./target/release/route-split.exe
 ```
 
 ---
