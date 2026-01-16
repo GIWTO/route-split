@@ -1,5 +1,5 @@
 [package]
-name = "triple-net-fixer"
+name = "route-split"
 version = "0.1.0"
 edition = "2021"
 description = "三网卡分流修复工具 - 解决 Windows 多网卡路由冲突"

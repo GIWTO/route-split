@@ -27,6 +27,6 @@ jobs:
     - name: Upload Release
       uses: ncipollo/release-action@v1
       with:
-        artifacts: "target/release/triple-net-fixer.exe"
+        artifacts: "target/release/route-split.exe"
         generateReleaseNotes: true
         allowUpdates: true
