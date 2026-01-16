@@ -1,0 +1,22 @@
+[package]
+name = "triple-net-fixer"
+version = "0.1.0"
+edition = "2021"
+description = "三网卡分流修复工具 - 解决 Windows 多网卡路由冲突"
+authors = ["Triple-Net Fixer Team"]
+
+[dependencies]
+eframe = "0.29"
+sysinfo = "0.32"
+winreg = "0.52"
+chrono = "0.4"
+arboard = "3.4"
+serde_json = "1.0"
+
+[build-dependencies]
+embed-resource = "2.4"
+
+[profile.release]
+opt-level = "z"
+lto = true
+strip = true
