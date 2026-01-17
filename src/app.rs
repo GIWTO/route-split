@@ -1,4 +1,4 @@
-// 三网卡分流修复工具 - 主应用逻辑
+// route-split - 主应用逻辑
 
 use eframe::egui::{self, CentralPanel, Color32, ComboBox, RichText, TopBottomPanel};
 use std::time::{Duration, Instant};
@@ -13,7 +13,7 @@ use crate::ui::{
 };
 
 /// 应用状态
-pub struct TripleNetFixerApp {
+pub struct RouteSplitApp {
     is_admin: bool,
     route_exists: bool,
     proxy_enabled: bool,
@@ -29,7 +29,7 @@ pub struct TripleNetFixerApp {
     target_mask: String,
 }
 
-impl Default for TripleNetFixerApp {
+impl Default for RouteSplitApp {
     fn default() -> Self {
         let is_admin = network::is_admin();
         let all_adapters = network::get_all_adapters();
@@ -63,7 +63,7 @@ impl Default for TripleNetFixerApp {
     }
 }
 
-impl TripleNetFixerApp {
+impl RouteSplitApp {
     fn refresh_status(&mut self) {
         if self.is_processing {
             return;
@@ -121,7 +121,7 @@ impl TripleNetFixerApp {
     }
 }
 
-impl eframe::App for TripleNetFixerApp {
+impl eframe::App for RouteSplitApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let dark_mode = ctx.style().visuals.dark_mode;
         if self.last_dark_mode != Some(dark_mode) {
@@ -154,200 +154,211 @@ impl eframe::App for TripleNetFixerApp {
             .frame(
                 egui::Frame::none()
                     .fill(theme::get_bg_color(dark_mode))
-                    .inner_margin(egui::Margin::symmetric(20.0, 16.0)),
+                    .inner_margin(egui::Margin::ZERO),
             )
             .show(ctx, |ui| {
                 egui::ScrollArea::vertical()
                     .auto_shrink([false; 2])
                     .show(ui, |ui| {
-                        // 标题
-                        ui.vertical_centered(|ui| {
-                            ui.label(
-                                RichText::new("TRIPLE-NET FIXER")
-                                    .color(theme::ACCENT_COLOR)
-                                    .size(11.0)
-                                    .strong(),
-                            );
-                            ui.add_space(-4.0);
-                            ui.label(
-                                RichText::new("三网分流修复工具")
-                                    .color(theme::get_text_color(dark_mode))
-                                    .size(26.0)
-                                    .strong(),
-                            );
-                        });
-                        ui.add_space(24.0);
-
-                        // 1. 网卡配置
-                        ui.label(
-                            RichText::new("🔌 网卡流向手动配置")
-                                .color(theme::get_text_color(dark_mode))
-                                .size(16.0)
-                                .strong(),
-                        );
-                        ui.add_space(8.0);
-                        egui::Frame::group(ui.style()).rounding(8.0).show(ui, |ui| {
-                            ui.set_width(ui.available_width());
-                            egui::Grid::new("adapters")
-                                .num_columns(2)
-                                .spacing([12.0, 16.0])
-                                .show(ui, |ui| {
-                                    ui.label("🌐 外网出口卡:");
-                                    ComboBox::from_id_salt("ext")
-                                        .width(ui.available_width())
-                                        .selected_text(
-                                            self.external_adapter_idx
-                                                .map(|i| self.all_adapters[i].name.as_str())
-                                                .unwrap_or("请选择..."),
-                                        )
-                                        .show_ui(ui, |ui| {
-                                            for (i, a) in self.all_adapters.iter().enumerate() {
-                                                ui.selectable_value(
-                                                    &mut self.external_adapter_idx,
-                                                    Some(i),
-                                                    format!("{} ({})", a.name, a.ip),
-                                                );
-                                            }
-                                        });
-                                    ui.end_row();
-                                    ui.label("🏢 内网分流卡:");
-                                    ComboBox::from_id_salt("int")
-                                        .width(ui.available_width())
-                                        .selected_text(
-                                            self.internal_adapter_idx
-                                                .map(|i| self.all_adapters[i].name.as_str())
-                                                .unwrap_or("请选择..."),
-                                        )
-                                        .show_ui(ui, |ui| {
-                                            for (i, a) in self.all_adapters.iter().enumerate() {
-                                                ui.selectable_value(
-                                                    &mut self.internal_adapter_idx,
-                                                    Some(i),
-                                                    format!("{} ({})", a.name, a.ip),
-                                                );
-                                            }
-                                        });
-                                    ui.end_row();
-                                });
-                            ui.add_space(8.0);
-                            if ui.button("🔄 刷新网卡列表").clicked() {
-                                self.refresh_adapters();
-                            }
-                        });
-                        ui.add_space(24.0);
-
-                        // 2. 状态预览
-                        status_panel::render_status_panel(
-                            ui,
-                            self.route_exists,
-                            self.proxy_enabled,
-                            &self
-                                .internal_adapter_idx
-                                .and_then(|i| self.all_adapters.get(i).cloned()),
-                            &self
-                                .external_adapter_idx
-                                .and_then(|i| self.all_adapters.get(i).cloned()),
-                            dark_mode,
-                        );
-                        ui.add_space(24.0);
-
-                        // 3. 目标配置
-                        ui.label(
-                            RichText::new("⚙ 自定义内网目标网段")
-                                .color(theme::get_text_color(dark_mode))
-                                .size(16.0)
-                                .strong(),
-                        );
-                        ui.add_space(8.0);
-                        egui::Frame::group(ui.style()).rounding(8.0).show(ui, |ui| {
-                            ui.set_width(ui.available_width());
-                            ui.horizontal(|ui| {
-                                ui.label("网段:");
-                                ui.add(
-                                    egui::TextEdit::singleline(&mut self.target_dest)
-                                        .desired_width(120.0),
-                                );
-                                ui.add_space(16.0);
-                                ui.label("掩码:");
-                                ui.add(
-                                    egui::TextEdit::singleline(&mut self.target_mask)
-                                        .desired_width(120.0),
-                                );
-                            });
-                        });
-                        ui.add_space(24.0);
-
-                        // 4. 动作按钮
-                        ui.horizontal(|ui| {
-                            // 主按钮 - 强调色背景
-                            let primary_btn = egui::Frame::none()
-                                .fill(theme::ACCENT_COLOR)
-                                .rounding(8.0)
-                                .inner_margin(egui::Margin::symmetric(28.0, 12.0))
-                                .show(ui, |ui| {
+                        egui::Frame::none()
+                            .inner_margin(egui::Margin::symmetric(20.0, 16.0))
+                            .show(ui, |ui| {
+                                // 标题
+                                ui.vertical_centered(|ui| {
                                     ui.label(
-                                        RichText::new("🚀 一键修复")
-                                            .color(Color32::WHITE)
-                                            .size(15.0)
+                                        RichText::new("ROUTE-SPLIT")
+                                            .color(theme::ACCENT_COLOR)
+                                            .size(11.0)
+                                            .strong(),
+                                    );
+                                    ui.add_space(-4.0);
+                                    ui.label(
+                                        RichText::new("路由分流工具")
+                                            .color(theme::get_text_color(dark_mode))
+                                            .size(26.0)
                                             .strong(),
                                     );
                                 });
-                            if primary_btn
-                                .response
-                                .interact(egui::Sense::click())
-                                .clicked()
-                            {
-                                self.do_fix();
-                            }
-                            if primary_btn
-                                .response
-                                .interact(egui::Sense::hover())
-                                .hovered()
-                            {
-                                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-                            }
+                                ui.add_space(24.0);
 
-                            ui.add_space(12.0);
-
-                            // 次要按钮 - 边框样式
-                            let secondary_btn = egui::Frame::none()
-                                .stroke(egui::Stroke::new(1.5, theme::get_border_color(dark_mode)))
-                                .rounding(8.0)
-                                .inner_margin(egui::Margin::symmetric(28.0, 12.0))
-                                .show(ui, |ui| {
-                                    ui.label(
-                                        RichText::new("↩ 回滚修复")
-                                            .color(theme::get_text_color(dark_mode))
-                                            .size(15.0),
-                                    );
+                                // 1. 网卡配置
+                                ui.label(
+                                    RichText::new("🔌 网卡流向手动配置")
+                                        .color(theme::get_text_color(dark_mode))
+                                        .size(16.0)
+                                        .strong(),
+                                );
+                                ui.add_space(8.0);
+                                egui::Frame::group(ui.style()).rounding(8.0).show(ui, |ui| {
+                                    ui.set_width(ui.available_width());
+                                    egui::Grid::new("adapters")
+                                        .num_columns(2)
+                                        .spacing([12.0, 16.0])
+                                        .show(ui, |ui| {
+                                            ui.label("🌐 外网出口卡:");
+                                            ComboBox::from_id_salt("ext")
+                                                .width(ui.available_width())
+                                                .selected_text(
+                                                    self.external_adapter_idx
+                                                        .map(|i| self.all_adapters[i].name.as_str())
+                                                        .unwrap_or("请选择..."),
+                                                )
+                                                .show_ui(ui, |ui| {
+                                                    for (i, a) in
+                                                        self.all_adapters.iter().enumerate()
+                                                    {
+                                                        ui.selectable_value(
+                                                            &mut self.external_adapter_idx,
+                                                            Some(i),
+                                                            format!("{} ({})", a.name, a.ip),
+                                                        );
+                                                    }
+                                                });
+                                            ui.end_row();
+                                            ui.label("🏢 内网分流卡:");
+                                            ComboBox::from_id_salt("int")
+                                                .width(ui.available_width())
+                                                .selected_text(
+                                                    self.internal_adapter_idx
+                                                        .map(|i| self.all_adapters[i].name.as_str())
+                                                        .unwrap_or("请选择..."),
+                                                )
+                                                .show_ui(ui, |ui| {
+                                                    for (i, a) in
+                                                        self.all_adapters.iter().enumerate()
+                                                    {
+                                                        ui.selectable_value(
+                                                            &mut self.internal_adapter_idx,
+                                                            Some(i),
+                                                            format!("{} ({})", a.name, a.ip),
+                                                        );
+                                                    }
+                                                });
+                                            ui.end_row();
+                                        });
+                                    ui.add_space(8.0);
+                                    if ui.button("🔄 刷新网卡列表").clicked() {
+                                        self.refresh_adapters();
+                                    }
                                 });
-                            if secondary_btn
-                                .response
-                                .interact(egui::Sense::click())
-                                .clicked()
-                            {
-                                self.do_rollback();
-                            }
-                            if secondary_btn
-                                .response
-                                .interact(egui::Sense::hover())
-                                .hovered()
-                            {
-                                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-                            }
-                        });
-                        ui.add_space(24.0);
+                                ui.add_space(24.0);
 
-                        // 5. 指南与日志
-                        cheatsheet::render_cheatsheet(
-                            ui,
-                            &mut self.cheatsheet_state,
-                            &self.target_dest,
-                        );
-                        ui.add_space(24.0);
-                        log_panel::render_log_panel(ui, &self.log_manager);
+                                // 2. 状态预览
+                                status_panel::render_status_panel(
+                                    ui,
+                                    self.route_exists,
+                                    self.proxy_enabled,
+                                    &self
+                                        .internal_adapter_idx
+                                        .and_then(|i| self.all_adapters.get(i).cloned()),
+                                    &self
+                                        .external_adapter_idx
+                                        .and_then(|i| self.all_adapters.get(i).cloned()),
+                                    dark_mode,
+                                );
+                                ui.add_space(24.0);
 
-                        ui.add_space(40.0);
+                                // 3. 目标配置
+                                ui.label(
+                                    RichText::new("⚙ 自定义内网目标网段")
+                                        .color(theme::get_text_color(dark_mode))
+                                        .size(16.0)
+                                        .strong(),
+                                );
+                                ui.add_space(8.0);
+                                egui::Frame::group(ui.style()).rounding(8.0).show(ui, |ui| {
+                                    ui.set_width(ui.available_width());
+                                    ui.horizontal(|ui| {
+                                        ui.label("网段:");
+                                        ui.add(
+                                            egui::TextEdit::singleline(&mut self.target_dest)
+                                                .desired_width(120.0),
+                                        );
+                                        ui.add_space(16.0);
+                                        ui.label("掩码:");
+                                        ui.add(
+                                            egui::TextEdit::singleline(&mut self.target_mask)
+                                                .desired_width(120.0),
+                                        );
+                                    });
+                                });
+                                ui.add_space(24.0);
+
+                                // 4. 动作按钮
+                                ui.horizontal(|ui| {
+                                    // 主按钮 - 强调色背景
+                                    let primary_btn = egui::Frame::none()
+                                        .fill(theme::ACCENT_COLOR)
+                                        .rounding(8.0)
+                                        .inner_margin(egui::Margin::symmetric(28.0, 12.0))
+                                        .show(ui, |ui| {
+                                            ui.label(
+                                                RichText::new("🚀 一键修复")
+                                                    .color(Color32::WHITE)
+                                                    .size(15.0)
+                                                    .strong(),
+                                            );
+                                        });
+                                    if primary_btn
+                                        .response
+                                        .interact(egui::Sense::click())
+                                        .clicked()
+                                    {
+                                        self.do_fix();
+                                    }
+                                    if primary_btn
+                                        .response
+                                        .interact(egui::Sense::hover())
+                                        .hovered()
+                                    {
+                                        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                    }
+
+                                    ui.add_space(12.0);
+
+                                    // 次要按钮 - 边框样式
+                                    let secondary_btn = egui::Frame::none()
+                                        .stroke(egui::Stroke::new(
+                                            1.5,
+                                            theme::get_border_color(dark_mode),
+                                        ))
+                                        .rounding(8.0)
+                                        .inner_margin(egui::Margin::symmetric(28.0, 12.0))
+                                        .show(ui, |ui| {
+                                            ui.label(
+                                                RichText::new("↩ 回滚修复")
+                                                    .color(theme::get_text_color(dark_mode))
+                                                    .size(15.0),
+                                            );
+                                        });
+                                    if secondary_btn
+                                        .response
+                                        .interact(egui::Sense::click())
+                                        .clicked()
+                                    {
+                                        self.do_rollback();
+                                    }
+                                    if secondary_btn
+                                        .response
+                                        .interact(egui::Sense::hover())
+                                        .hovered()
+                                    {
+                                        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                    }
+                                });
+                                ui.add_space(24.0);
+
+                                // 5. 指南与日志
+                                cheatsheet::render_cheatsheet(
+                                    ui,
+                                    &mut self.cheatsheet_state,
+                                    &self.target_dest,
+                                );
+                                ui.add_space(24.0);
+                                log_panel::render_log_panel(ui, &self.log_manager);
+
+                                ui.add_space(40.0);
+                            });
                     });
             });
     }

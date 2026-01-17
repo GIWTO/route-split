@@ -34,6 +34,13 @@ pub fn render_status_panel(
 
             ui.horizontal(|ui| {
                 ui.label(RichText::new("🌎 外网出口").color(text_color).strong());
+                ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
+                    if external_adapter.is_some() && !proxy_enabled {
+                        ui.label(RichText::new("● 已生效").color(SUCCESS_COLOR).size(10.0));
+                    } else {
+                        ui.label(RichText::new("○ 未生效").color(secondary_color).size(10.0));
+                    }
+                });
             });
             ui.add_space(4.0);
             if let Some(ext) = external_adapter {
