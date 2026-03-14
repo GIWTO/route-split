@@ -3,10 +3,10 @@
   <assemblyIdentity
     version="1.0.0.0"
     processorArchitecture="*"
-    name="TripleNetFixer"
+    name="RouteSplit"
     type="win32"
   />
-  <description>三网卡分流修复工具</description>
+  <description>路由分流工具</description>
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
     <security>
       <requestedPrivileges>

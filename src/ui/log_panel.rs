@@ -112,13 +112,13 @@ pub fn render_log_panel(ui: &mut Ui, log_manager: &LogManager) {
         .rounding(8.0)
         .inner_margin(8.0)
         .show(ui, |ui| {
-            ui.set_width(ui.available_width()); // 关键修复
+            ui.set_width(ui.available_width()); // 关键配置
 
             ScrollArea::vertical()
                 .max_height(200.0)
                 .stick_to_bottom(true)
                 .show(ui, |ui| {
-                    ui.set_width(ui.available_width()); // 关键修复
+                    ui.set_width(ui.available_width()); // 关键配置
 
                     if log_manager.entries().is_empty() {
                         ui.label(

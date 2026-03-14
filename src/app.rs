@@ -109,7 +109,7 @@ impl RouteSplitApp {
         let _ = network::flush_network();
         self.is_processing = false;
         self.refresh_status();
-        self.log_manager.ok("✅ 修复完成!");
+        self.log_manager.ok("✅ 配置完成!");
     }
 
     fn do_rollback(&mut self) {
@@ -293,7 +293,7 @@ impl eframe::App for RouteSplitApp {
                                         .inner_margin(egui::Margin::symmetric(28.0, 12.0))
                                         .show(ui, |ui| {
                                             ui.label(
-                                                RichText::new("🚀 一键修复")
+                                                RichText::new("🚀 一键配置")
                                                     .color(Color32::WHITE)
                                                     .size(15.0)
                                                     .strong(),
@@ -326,7 +326,7 @@ impl eframe::App for RouteSplitApp {
                                         .inner_margin(egui::Margin::symmetric(28.0, 12.0))
                                         .show(ui, |ui| {
                                             ui.label(
-                                                RichText::new("↩ 回滚修复")
+                                                RichText::new("↩ 回滚配置")
                                                     .color(theme::get_text_color(dark_mode))
                                                     .size(15.0),
                                             );

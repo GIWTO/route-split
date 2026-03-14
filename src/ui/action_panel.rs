@@ -7,7 +7,7 @@ use eframe::egui::{Button, RichText, Ui, Vec2};
 pub enum ActionResult {
     /// 无操作
     None,
-    /// 点击了修复按钮
+    /// 点击了配置按钮
     Fix,
     /// 点击了回滚按钮
     Rollback,
@@ -29,11 +29,11 @@ pub fn render_action_panel(ui: &mut Ui, is_admin: bool, is_processing: bool) -> 
         ui.add_space(8.0);
 
         ui.horizontal(|ui| {
-            // 一键修复按钮 (Primary)
+            // 一键配置按钮 (Primary)
             let fix_text = if is_processing {
                 "⏳ 正在处理..."
             } else {
-                "🚀 一键修复分流"
+                "🚀 一键配置分流"
             };
             let fix_button = Button::new(
                 RichText::new(fix_text)

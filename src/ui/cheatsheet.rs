@@ -38,7 +38,6 @@ fn generate_config(target_dest: &str) -> String {
         "sinopec.com",
         "+.sinopec.com",
         "*.internal.company.com",
-        "*.corp.local",
     ];
 
     let mut config = String::from("fake-ip-filter:\n");
@@ -99,7 +98,7 @@ pub fn render_cheatsheet(ui: &mut Ui, state: &mut CheatsheetState, target_dest: 
         .rounding(8.0)
         .inner_margin(12.0)
         .show(ui, |ui| {
-            ui.set_width(ui.available_width()); // 关键修复
+            ui.set_width(ui.available_width()); // 关键配置
 
             let response = ui.add(
                 egui::Label::new(
