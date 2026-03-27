@@ -80,6 +80,7 @@ impl LogManager {
         self.log(LogLevel::Ok, message);
     }
 
+    #[allow(dead_code)]
     pub fn warn(&mut self, message: impl Into<String>) {
         self.log(LogLevel::Warning, message);
     }
@@ -107,10 +108,11 @@ pub fn render_log_panel(ui: &mut Ui, log_manager: &LogManager) {
     );
     ui.add_space(4.0);
 
-    egui::Frame::group(ui.style())
+    egui::Frame::none()
         .fill(ui.visuals().extreme_bg_color)
-        .rounding(8.0)
-        .inner_margin(8.0)
+        .rounding(10.0)
+        .stroke(egui::Stroke::new(1.0, theme::get_border_color(dark_mode)))
+        .inner_margin(10.0)
         .show(ui, |ui| {
             ui.set_width(ui.available_width()); // 关键配置
 

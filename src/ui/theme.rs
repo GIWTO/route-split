@@ -5,18 +5,18 @@ use eframe::egui::{Color32, FontData, FontDefinitions, FontFamily, Rounding, Sty
 /// 背景色 - 动态获取
 pub fn get_bg_color(dark_mode: bool) -> Color32 {
     if dark_mode {
-        Color32::from_rgb(0x0F, 0x17, 0x2A)
+        Color32::from_rgb(26, 27, 30) // #1A1B1E
     } else {
-        Color32::from_rgb(0xF8, 0xFA, 0xFC)
+        Color32::from_rgb(248, 250, 252)
     }
 }
 
 /// 卡片背景色 - 动态获取
 pub fn get_card_bg_color(dark_mode: bool) -> Color32 {
     if dark_mode {
-        Color32::from_rgb(0x02, 0x06, 0x17)
+        Color32::from_rgb(32, 33, 35) // #202123
     } else {
-        Color32::from_rgb(0xFF, 0xFF, 0xFF)
+        Color32::from_rgb(255, 255, 255)
     }
 }
 
@@ -87,11 +87,11 @@ pub fn get_theme_visuals(dark_mode: bool) -> Visuals {
     visuals.widgets.active.bg_fill = ACCENT_COLOR;
     visuals.widgets.active.fg_stroke.color = Color32::WHITE;
 
-    visuals.widgets.noninteractive.rounding = Rounding::same(8.0);
-    visuals.widgets.inactive.rounding = Rounding::same(8.0);
-    visuals.widgets.hovered.rounding = Rounding::same(8.0);
-    visuals.widgets.active.rounding = Rounding::same(8.0);
-    visuals.window_rounding = Rounding::same(12.0);
+    visuals.widgets.noninteractive.rounding = Rounding::same(10.0);
+    visuals.widgets.inactive.rounding = Rounding::same(10.0);
+    visuals.widgets.hovered.rounding = Rounding::same(10.0);
+    visuals.widgets.active.rounding = Rounding::same(10.0);
+    visuals.window_rounding = Rounding::same(16.0);
 
     visuals
 }
@@ -131,13 +131,14 @@ pub fn setup_fonts(ctx: &eframe::egui::Context) {
 }
 
 pub fn configure_style(style: &mut Style) {
-    style.spacing.item_spacing = eframe::egui::vec2(8.0, 12.0);
-    style.spacing.button_padding = eframe::egui::vec2(20.0, 10.0);
-    style.spacing.interact_size = eframe::egui::vec2(60.0, 28.0);
+    style.spacing.item_spacing = eframe::egui::vec2(10.0, 14.0);
+    style.spacing.button_padding = eframe::egui::vec2(16.0, 8.0);
+    style.spacing.window_margin = eframe::egui::Margin::same(20.0);
+    style.spacing.interact_size = eframe::egui::vec2(60.0, 32.0);
 
     // --- 极简现代滚动条配置 ---
-    style.spacing.scroll.bar_width = 6.0;
-    style.spacing.scroll.handle_min_length = 24.0;
+    style.spacing.scroll.bar_width = 8.0;
+    style.spacing.scroll.handle_min_length = 32.0;
     style.spacing.scroll.bar_inner_margin = 2.0;
     style.spacing.scroll.bar_outer_margin = 0.0;
 }

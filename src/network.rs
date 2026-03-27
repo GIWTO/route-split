@@ -1,10 +1,26 @@
 // 网络操作模块：权限检测、网关探测、路由操作
 
 use std::process::Command;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+/// Windows 创建进程标志：不创建控制台窗口
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+/// 创建一个新的命令，在 Windows 下默认隐藏控制台窗口
+fn new_command(program: &str) -> Command {
+    let mut cmd = Command::new(program);
+    #[cfg(windows)]
+    {
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    cmd
+}
 
 /// 检测当前进程是否具有管理员权限
 pub fn is_admin() -> bool {
-    let output = Command::new("cmd").args(["/C", "net", "session"]).output();
+    let output = new_command("cmd").args(["/C", "net", "session"]).output();
     match output {
         Ok(result) => result.status.success(),
         Err(_) => false,
@@ -24,7 +40,7 @@ pub fn get_all_adapters() -> Vec<AdapterInfo> {
     let mut adapters = Vec::new();
 
     // 强制使用 UTF-8 输出并运行 ipconfig
-    let output = Command::new("cmd")
+    let output = new_command("cmd")
         .args(["/C", "chcp 65001 > nul && ipconfig"])
         .output();
 
@@ -102,7 +118,7 @@ pub fn get_all_adapters() -> Vec<AdapterInfo> {
     // --- 兜底方案：如果 ipconfig 没拿到，尝试 PowerShell (仅在空列表时执行) ---
     if adapters.is_empty() {
         let ps_cmd = "Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.PrefixOrigin -ne 'WellKnown' } | Select-Object InterfaceAlias, IPAddress | ConvertTo-Json";
-        if let Ok(output) = Command::new("powershell")
+        if let Ok(output) = new_command("powershell")
             .args(["-Command", ps_cmd])
             .output()
         {
@@ -148,18 +164,102 @@ pub struct RouteResult {
     pub message: String,
 }
 
-/// 检查特定路由是否存在
+/// 检查特定路由是否存在 (强制英文输出以提高解析稳定性)
 pub fn check_route_exists(dest: &str) -> bool {
-    // 强制 UTF8
-    if let Ok(output) = Command::new("cmd")
-        .args(["/C", "chcp 65001 > nul && route print", dest, "-4"])
-        .output()
-    {
-        let stdout = String::from_utf8_lossy(&output.stdout);
+    let output = new_command("cmd")
+        .args(["/C", "chcp 437 > nul && route print", dest, "-4"])
+        .output();
+    
+    if let Ok(o) = output {
+        let stdout = String::from_utf8_lossy(&o.stdout);
+        // 在英文环境下，Active Routes 后面会紧跟目标地址
         stdout.contains(dest)
     } else {
         false
     }
+}
+
+/// 获取活跃的 IPv4 路由表条目
+pub fn get_active_routes() -> Vec<RouteEntry> {
+    let mut routes = Vec::new();
+    let output = new_command("cmd")
+        .args(["/C", "chcp 437 > nul && route print -4"])
+        .output();
+
+    if let Ok(o) = output {
+        let stdout = String::from_utf8_lossy(&o.stdout);
+        let mut in_section = false;
+        for line in stdout.lines() {
+            let trimmed = line.trim();
+            if trimmed.contains("Active Routes:") {
+                in_section = true;
+                continue;
+            }
+            if in_section && trimmed.contains("Network Destination") {
+                continue;
+            }
+            if in_section && trimmed.is_empty() && !routes.is_empty() {
+                break;
+            }
+            if in_section {
+                let parts: Vec<&str> = trimmed.split_whitespace().collect();
+                if parts.len() >= 4 {
+                    routes.push(RouteEntry {
+                        destination: parts[0].to_string(),
+                        mask: parts[1].to_string(),
+                        gateway: parts[2].to_string(),
+                        interface: parts[3].to_string(),
+                    });
+                }
+            }
+        }
+    }
+    routes
+}
+
+/// 过滤出关键的分流路由 (例如针对 10.0.0.0/8 的条目)
+pub fn get_active_routes_filtered(prefix: &str) -> Vec<RouteEntry> {
+    get_active_routes()
+        .into_iter()
+        .filter(|r| r.destination.starts_with(prefix))
+        .collect()
+}
+
+/// Ping 网关并返回延迟 (ms)
+pub fn ping_gateway(ip: &str) -> Option<u32> {
+    if ip == "无网关" || ip == "待探测" || ip.is_empty() {
+        return None;
+    }
+    
+    // Windows 下使用 -n 1 (次数) 和 -w 1000 (超时毫秒)
+    let output = new_command("ping")
+        .args(["-n", "1", "-w", "1000", ip])
+        .output();
+    
+    if let Ok(o) = output {
+        let stdout = String::from_utf8_lossy(&o.stdout);
+        // 匹配 "time=5ms" 或 "时间=5ms" 或 "<1ms" 等
+        for line in stdout.lines() {
+            let line_lower = line.to_lowercase();
+            if line_lower.contains("ms") && (line_lower.contains("time") || line_lower.contains("时间") || line_lower.contains("ttl=")) {
+                // 尝试提取数值。格式通常为: ...time=5ms... 或 ...时间<1ms...
+                let parts: Vec<&str> = line_lower.split(|c: char| !c.is_numeric()).filter(|s| !s.is_empty()).collect();
+                // 延迟数值通常在 "ms" 之前。在单次 ping 中，通常倒数第二个或最后一个数字是延迟
+                if let Some(val) = parts.last() {
+                    return val.parse().ok();
+                }
+            }
+        }
+    }
+    None
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct RouteEntry {
+    pub destination: String,
+    pub mask: String,
+    pub gateway: String,
+    pub interface: String,
 }
 
 /// 添加路由
@@ -170,10 +270,10 @@ pub fn add_route(dest: &str, mask: &str, gw: &str) -> RouteResult {
             message: "该网卡没有有效网关，无法分流".into(),
         };
     }
-    let _ = Command::new("cmd")
+    let _ = new_command("cmd")
         .args(["/C", "route", "delete", dest])
         .output();
-    let res = Command::new("cmd")
+    let res = new_command("cmd")
         .args([
             "/C", "route", "add", dest, "mask", mask, gw, "metric", "10", "-p",
         ])
@@ -196,7 +296,7 @@ pub fn add_route(dest: &str, mask: &str, gw: &str) -> RouteResult {
 
 /// 删除路由
 pub fn delete_route(dest: &str) -> RouteResult {
-    let _ = Command::new("cmd")
+    let _ = new_command("cmd")
         .args(["/C", "route", "delete", dest])
         .output();
     RouteResult {
@@ -207,7 +307,7 @@ pub fn delete_route(dest: &str) -> RouteResult {
 
 /// 刷新 DNS
 pub fn flush_network() -> RouteResult {
-    let _ = Command::new("cmd")
+    let _ = new_command("cmd")
         .args(["/C", "ipconfig", "/flushdns"])
         .output();
     RouteResult {

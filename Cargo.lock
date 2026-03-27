@@ -2628,6 +2628,7 @@ dependencies = [
  "chrono",
  "eframe",
  "embed-resource",
+ "serde",
  "serde_json",
  "sysinfo",
  "winreg",

@@ -1,7 +1,7 @@
 // 咒语区组件 - FlClash fake-ip-filter 配置
 
 use super::theme::{self, SUCCESS_COLOR};
-use arboard::Clipboard;
+use arboard;
 use eframe::egui::{self, RichText, Sense, Ui};
 use std::time::Instant;
 
@@ -84,8 +84,7 @@ pub fn render_cheatsheet(ui: &mut Ui, state: &mut CheatsheetState, target_dest: 
     });
     ui.add_space(8.0);
 
-    // 代码块容器 - 关键：设置宽度
-    egui::Frame::group(ui.style())
+    egui::Frame::none()
         .fill(card_bg)
         .stroke(egui::Stroke::new(
             1.0,
@@ -95,10 +94,10 @@ pub fn render_cheatsheet(ui: &mut Ui, state: &mut CheatsheetState, target_dest: 
                 border_color
             },
         ))
-        .rounding(8.0)
+        .rounding(10.0)
         .inner_margin(12.0)
         .show(ui, |ui| {
-            ui.set_width(ui.available_width()); // 关键配置
+            ui.set_width(ui.available_width());
 
             let response = ui.add(
                 egui::Label::new(
@@ -108,14 +107,15 @@ pub fn render_cheatsheet(ui: &mut Ui, state: &mut CheatsheetState, target_dest: 
                         } else {
                             secondary_color
                         })
-                        .size(13.0)
+                        .size(12.0)
                         .family(egui::FontFamily::Monospace),
                 )
+                .wrap_mode(egui::TextWrapMode::Extend)
                 .sense(Sense::click()),
             );
 
             if response.clicked() {
-                if let Ok(mut clipboard) = Clipboard::new() {
+                if let Ok(mut clipboard) = arboard::Clipboard::new() {
                     if clipboard.set_text(&current_config).is_ok() {
                         state.mark_copied();
                     }
