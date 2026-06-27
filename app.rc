@@ -1,3 +1,4 @@
-// Windows 资源文件，链接 manifest
+// Windows 资源文件，链接 manifest 和图标
 #include "winuser.h"
 1 RT_MANIFEST "app.manifest"
+MAINICON ICON "app.ico"

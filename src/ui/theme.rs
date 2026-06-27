@@ -1,26 +1,79 @@
-// Terminal 风格主题配置
+// theme.rs - 统一的主题系统配置
 
-use eframe::egui::{Color32, FontData, FontDefinitions, FontFamily, Rounding, Style, Visuals};
+use eframe::egui::{Color32, FontData, FontDefinitions, FontFamily, Frame, Margin, Rounding, Style, Ui, RichText, Visuals};
 
-/// 背景色 - 动态获取
+// --- 字号常量定义 ---
+pub const FONT_SIZE_TITLE: f32 = 22.0;
+pub const FONT_SIZE_SUBTITLE: f32 = 15.0;
+pub const FONT_SIZE_BODY: f32 = 13.0;
+pub const FONT_SIZE_SMALL: f32 = 11.5;
+pub const FONT_SIZE_TINY: f32 = 10.0;
+
+// --- 圆角定义 ---
+pub const CARD_ROUNDING: f32 = 14.0;
+pub const BUTTON_ROUNDING: f32 = 8.0;
+pub const BADGE_ROUNDING: f32 = 99.0;
+
+// --- 核心状态色板 ---
+pub const ACCENT_COLOR: Color32 = Color32::from_rgb(0x25, 0x63, 0xEB);   // 主色蓝
+pub const SUCCESS_COLOR: Color32 = Color32::from_rgb(0x10, 0xB9, 0x81);  // 成功绿
+pub const WARNING_COLOR: Color32 = Color32::from_rgb(0xF5, 0x9E, 0x0B);  // 警告橙
+pub const DANGER_COLOR: Color32 = Color32::from_rgb(0xEF, 0x44, 0x44);   // 危险红
+
+// --- 主题模式枚举 ---
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum ThemeMode {
+    System,
+    Light,
+    Dark,
+}
+
+impl Default for ThemeMode {
+    fn default() -> Self {
+        Self::System
+    }
+}
+
+impl ThemeMode {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::System => "💻 跟随系统",
+            Self::Light => "🌞 亮色模式",
+            Self::Dark => "🌙 暗色模式",
+        }
+    }
+}
+
+// --- 动态获取配色 ---
+
+/// 主背景色
 pub fn get_bg_color(dark_mode: bool) -> Color32 {
     if dark_mode {
-        Color32::from_rgb(26, 27, 30) // #1A1B1E
+        Color32::from_rgb(0x0F, 0x17, 0x2A) // #0F172A
     } else {
-        Color32::from_rgb(248, 250, 252)
+        Color32::from_rgb(0xF8, 0xFA, 0xFC) // #F8FAFC
     }
 }
 
-/// 卡片背景色 - 动态获取
+/// 卡片背景色
 pub fn get_card_bg_color(dark_mode: bool) -> Color32 {
     if dark_mode {
-        Color32::from_rgb(32, 33, 35) // #202123
+        Color32::from_rgb(0x1E, 0x29, 0x3B) // #1E293B
     } else {
-        Color32::from_rgb(255, 255, 255)
+        Color32::from_rgb(0xFF, 0xFF, 0xFF) // #FFFFFF
     }
 }
 
-/// 文字色 - 动态获取
+/// 卡片内部只读/二级填充色 (CARD_SOFT)
+pub fn get_card_soft_color(dark_mode: bool) -> Color32 {
+    if dark_mode {
+        Color32::from_rgb(0x33, 0x41, 0x55) // #334155
+    } else {
+        Color32::from_rgb(0xF1, 0xF5, 0xF9) // #F1F5F9
+    }
+}
+
+/// 主要文字色
 pub fn get_text_color(dark_mode: bool) -> Color32 {
     if dark_mode {
         Color32::from_rgb(0xF8, 0xFA, 0xFC)
@@ -29,7 +82,7 @@ pub fn get_text_color(dark_mode: bool) -> Color32 {
     }
 }
 
-/// 次要文字色 - 动态获取
+/// 次要文字色
 pub fn get_secondary_text_color(dark_mode: bool) -> Color32 {
     if dark_mode {
         Color32::from_rgb(0x94, 0xA1, 0xB8)
@@ -38,20 +91,27 @@ pub fn get_secondary_text_color(dark_mode: bool) -> Color32 {
     }
 }
 
-/// 边框色 - 动态获取
+/// 边框色
 pub fn get_border_color(dark_mode: bool) -> Color32 {
     if dark_mode {
-        Color32::from_rgb(0x1F, 0x29, 0x37)
+        Color32::from_rgb(0x33, 0x41, 0x55) // #334155
     } else {
-        Color32::from_rgb(0xE2, 0xE8, 0xF0)
+        Color32::from_rgb(0xE2, 0xE8, 0xF0) // #E2E8F0
     }
 }
 
-pub const SUCCESS_COLOR: Color32 = Color32::from_rgb(0x10, 0xB9, 0x81);
-pub const WARNING_COLOR: Color32 = Color32::from_rgb(0xF5, 0x9E, 0x0B);
-pub const DANGER_COLOR: Color32 = Color32::from_rgb(0xF4, 0x3F, 0x5E);
-pub const ACCENT_COLOR: Color32 = Color32::from_rgb(0x3B, 0x82, 0xF6);
+// --- 胶囊徽章组件 ---
+pub fn draw_badge(ui: &mut Ui, text: &str, text_color: Color32, bg_color: Color32) {
+    Frame::none()
+        .fill(bg_color)
+        .rounding(Rounding::same(BADGE_ROUNDING))
+        .inner_margin(Margin::symmetric(8.0, 3.0))
+        .show(ui, |ui| {
+            ui.label(RichText::new(text).color(text_color).size(FONT_SIZE_SMALL).strong());
+        });
+}
 
+// --- Visuals 样式初始化 ---
 pub fn get_theme_visuals(dark_mode: bool) -> Visuals {
     let mut visuals = if dark_mode {
         Visuals::dark()
@@ -66,32 +126,36 @@ pub fn get_theme_visuals(dark_mode: bool) -> Visuals {
 
     visuals.panel_fill = bg;
     visuals.window_fill = bg;
-    visuals.extreme_bg_color = card_bg;
+    visuals.extreme_bg_color = get_card_soft_color(dark_mode); // 输入框等深度背景使用 soft 填充
     visuals.widgets.noninteractive.bg_fill = card_bg;
     visuals.widgets.noninteractive.bg_stroke.color = border;
     visuals.widgets.noninteractive.fg_stroke.color = secondary_text;
+    
     visuals.widgets.inactive.bg_fill = if dark_mode {
-        Color32::from_rgb(0x1F, 0x29, 0x37)
+        Color32::from_rgb(0x33, 0x41, 0x55)
     } else {
         Color32::from_rgb(0xF1, 0xF5, 0xF9)
     };
     visuals.widgets.inactive.bg_stroke.color = border;
     visuals.widgets.inactive.fg_stroke.color = text;
+    
     visuals.widgets.hovered.bg_fill = if dark_mode {
-        Color32::from_rgb(0x37, 0x41, 0x51)
+        Color32::from_rgb(0x47, 0x55, 0x69)
     } else {
         Color32::from_rgb(0xE2, 0xE8, 0xF0)
     };
     visuals.widgets.hovered.bg_stroke.color = ACCENT_COLOR;
     visuals.widgets.hovered.fg_stroke.color = text;
+    
     visuals.widgets.active.bg_fill = ACCENT_COLOR;
     visuals.widgets.active.fg_stroke.color = Color32::WHITE;
 
-    visuals.widgets.noninteractive.rounding = Rounding::same(10.0);
-    visuals.widgets.inactive.rounding = Rounding::same(10.0);
-    visuals.widgets.hovered.rounding = Rounding::same(10.0);
-    visuals.widgets.active.rounding = Rounding::same(10.0);
-    visuals.window_rounding = Rounding::same(16.0);
+    // 统一设置基础控件圆角为 BUTTON_ROUNDING (8.0)
+    visuals.widgets.noninteractive.rounding = Rounding::same(BUTTON_ROUNDING);
+    visuals.widgets.inactive.rounding = Rounding::same(BUTTON_ROUNDING);
+    visuals.widgets.hovered.rounding = Rounding::same(BUTTON_ROUNDING);
+    visuals.widgets.active.rounding = Rounding::same(BUTTON_ROUNDING);
+    visuals.window_rounding = Rounding::same(CARD_ROUNDING);
 
     visuals
 }

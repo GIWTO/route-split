@@ -37,6 +37,8 @@ pub struct RouteSplitApp {
     last_refresh: Instant,
     last_monitor: Instant,
     last_dark_mode: Option<bool>,
+    theme_mode: theme::ThemeMode,
+    force_update_theme: bool,
     target_dest: String,
     target_mask: String,
     internal_ping: Option<u32>,
@@ -73,6 +75,8 @@ impl Default for RouteSplitApp {
             last_refresh: Instant::now(),
             last_monitor: Instant::now() - Duration::from_secs(10), // 启动即触发第一次探测
             last_dark_mode: None,
+            theme_mode: theme::ThemeMode::System,
+            force_update_theme: true,
             target_dest: "10.0.0.0".to_string(),
             target_mask: "255.0.0.0".to_string(),
             internal_ping: None,
@@ -191,10 +195,15 @@ impl RouteSplitApp {
 
 impl eframe::App for RouteSplitApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let dark_mode = ctx.style().visuals.dark_mode;
-        if self.last_dark_mode != Some(dark_mode) {
+        let dark_mode = match self.theme_mode {
+            theme::ThemeMode::System => ctx.style().visuals.dark_mode,
+            theme::ThemeMode::Light => false,
+            theme::ThemeMode::Dark => true,
+        };
+        if self.last_dark_mode != Some(dark_mode) || self.force_update_theme {
             ctx.set_visuals(theme::get_theme_visuals(dark_mode));
             self.last_dark_mode = Some(dark_mode);
+            self.force_update_theme = false;
         }
 
         // 检查后台任务结果
@@ -248,7 +257,7 @@ impl eframe::App for RouteSplitApp {
                         ui.label(
                             RichText::new("🔒 权限受限：请以管理员身份运行")
                                 .color(Color32::WHITE)
-                                .size(13.0)
+                                .size(theme::FONT_SIZE_BODY)
                                 .strong(),
                         );
                     });
@@ -265,92 +274,154 @@ impl eframe::App for RouteSplitApp {
                 egui::ScrollArea::vertical()
                     .auto_shrink([false; 2])
                     .show(ui, |ui| {
+                        let available_w = ui.available_width();
+                        let max_w = 980.0;
+                        let extra_margin = if available_w > max_w {
+                            (available_w - max_w) / 2.0
+                        } else {
+                            0.0
+                        };
+
                         egui::Frame::none()
-                            .inner_margin(egui::Margin::symmetric(24.0, 20.0))
+                            .inner_margin(egui::Margin {
+                                left: 24.0 + extra_margin,
+                                right: 24.0 + extra_margin,
+                                top: 20.0,
+                                bottom: 20.0,
+                            })
                             .show(ui, |ui| {
-                                // 标题部分
-                                ui.vertical_centered(|ui| {
-                                    ui.label(RichText::new("ROUTE-SPLIT").color(theme::ACCENT_COLOR).size(10.0).strong());
-                                    ui.add_space(-2.0);
-                                    ui.label(RichText::new("路由分流工具").color(theme::get_text_color(dark_mode)).size(24.0).strong());
-                                });
-                                ui.add_space(32.0);
-
-                                // 1. 快捷操作面板 (Top Actions)
-                                let action = action_panel::render_action_panel(ui, self.is_admin, self.is_processing);
-                                match action {
-                                    ActionResult::Fix => self.do_fix(),
-                                    ActionResult::Rollback => self.do_rollback(),
-                                    ActionResult::Refresh => self.refresh_adapters(),
-                                    _ => {}
-                                }
-                                ui.add_space(24.0);
-
-                                // 2. 状态监测面板 (Status & Cards)
-                                status_panel::render_status_panel(
-                                    ui,
-                                    self.route_exists,
-                                    self.proxy_enabled,
-                                    &self.internal_adapter_idx.and_then(|i| self.all_adapters.get(i).cloned()),
-                                    &self.external_adapter_idx.and_then(|i| self.all_adapters.get(i).cloned()),
-                                    self.internal_ping,
-                                    self.external_ping,
-                                    &self.active_routes,
-                                    dark_mode,
-                                );
-                                ui.add_space(24.0);
-
-                                // 3. 配置细节 (Adapters & Target)
-                                ui.label(RichText::new("⚙ 配置详情").color(theme::get_text_color(dark_mode)).size(16.0).strong());
-                                ui.add_space(8.0);
-                                egui::Frame::none()
-                                    .fill(theme::get_card_bg_color(dark_mode))
-                                    .rounding(10.0)
-                                    .stroke(egui::Stroke::new(1.0, theme::get_border_color(dark_mode)))
-                                    .inner_margin(16.0)
-                                    .show(ui, |ui| {
-                                        ui.set_width(ui.available_width());
-                                        egui::Grid::new("config_grid").num_columns(2).spacing([12.0, 12.0]).show(ui, |ui| {
-                                            ui.label("🌎 外网出口:");
-                                            ComboBox::from_id_salt("ext")
-                                                .width(ui.available_width())
-                                                .selected_text(self.external_adapter_idx.map(|i| self.all_adapters[i].name.as_str()).unwrap_or("未选择"))
-                                                .show_ui(ui, |ui| {
-                                                    for (i, a) in self.all_adapters.iter().enumerate() {
-                                                        ui.selectable_value(&mut self.external_adapter_idx, Some(i), format!("{} ({})", a.name, a.ip));
-                                                    }
-                                                });
-                                            ui.end_row();
-
-                                            ui.label("🏢 内网网段:");
-                                            ComboBox::from_id_salt("int")
-                                                .width(ui.available_width())
-                                                .selected_text(self.internal_adapter_idx.map(|i| self.all_adapters[i].name.as_str()).unwrap_or("未选择"))
-                                                .show_ui(ui, |ui| {
-                                                    for (i, a) in self.all_adapters.iter().enumerate() {
-                                                        ui.selectable_value(&mut self.internal_adapter_idx, Some(i), format!("{} ({})", a.name, a.ip));
-                                                    }
-                                                });
-                                            ui.end_row();
-
-                                            ui.label("🎯 目标地址:");
-                                            ui.horizontal(|ui| {
-                                                ui.add(egui::TextEdit::singleline(&mut self.target_dest).desired_width(100.0));
-                                                ui.label("/");
-                                                ui.add(egui::TextEdit::singleline(&mut self.target_mask).desired_width(100.0));
+                                ui.vertical(|ui| {
+                                        // 顶栏：标题与主题切换
+                                        ui.horizontal(|ui| {
+                                            ui.vertical(|ui| {
+                                                ui.label(
+                                                    RichText::new("ROUTE-SPLIT")
+                                                        .color(theme::ACCENT_COLOR)
+                                                        .size(theme::FONT_SIZE_TINY)
+                                                        .strong(),
+                                                );
+                                                ui.add_space(-4.0);
+                                                ui.label(
+                                                    RichText::new("路由分流工具")
+                                                        .color(theme::get_text_color(dark_mode))
+                                                        .size(theme::FONT_SIZE_TITLE)
+                                                        .strong(),
+                                                );
                                             });
-                                            ui.end_row();
-                                        });
-                                    });
-                                ui.add_space(32.0);
 
-                                // 4. 指南与日志
-                                cheatsheet::render_cheatsheet(ui, &mut self.cheatsheet_state, &self.target_dest);
-                                ui.add_space(24.0);
-                                log_panel::render_log_panel(ui, &self.log_manager);
-                                ui.add_space(40.0);
+                                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                ComboBox::from_id_salt("theme_selector")
+                                                    .selected_text(self.theme_mode.label())
+                                                    .width(110.0)
+                                                    .show_ui(ui, |ui| {
+                                                        if ui.selectable_value(&mut self.theme_mode, theme::ThemeMode::System, theme::ThemeMode::System.label()).clicked() {
+                                                            self.force_update_theme = true;
+                                                        }
+                                                        if ui.selectable_value(&mut self.theme_mode, theme::ThemeMode::Light, theme::ThemeMode::Light.label()).clicked() {
+                                                            self.force_update_theme = true;
+                                                        }
+                                                        if ui.selectable_value(&mut self.theme_mode, theme::ThemeMode::Dark, theme::ThemeMode::Dark.label()).clicked() {
+                                                            self.force_update_theme = true;
+                                                        }
+                                                    });
+                                            });
+                                        });
+                                        ui.add_space(28.0);
+
+                                        // 1. 快捷操作面板 (Top Actions)
+                                        let action = action_panel::render_action_panel(ui, self.is_admin, self.is_processing);
+                                        match action {
+                                            ActionResult::Fix => self.do_fix(),
+                                            ActionResult::Rollback => self.do_rollback(),
+                                            ActionResult::Refresh => self.refresh_adapters(),
+                                            _ => {}
+                                        }
+                                        ui.add_space(24.0);
+
+                                        // 2. 状态监测面板 (Status & Cards)
+                                        status_panel::render_status_panel(
+                                            ui,
+                                            self.route_exists,
+                                            self.proxy_enabled,
+                                            &self.internal_adapter_idx.and_then(|i| self.all_adapters.get(i).cloned()),
+                                            &self.external_adapter_idx.and_then(|i| self.all_adapters.get(i).cloned()),
+                                            self.internal_ping,
+                                            self.external_ping,
+                                            &self.active_routes,
+                                            dark_mode,
+                                        );
+                                        ui.add_space(24.0);
+
+                                        // 3. 配置细节 (Adapters & Target)
+                                        ui.label(
+                                            RichText::new("⚙ 配置详情")
+                                                .color(theme::get_text_color(dark_mode))
+                                                .size(theme::FONT_SIZE_SUBTITLE)
+                                                .strong(),
+                                        );
+                                        ui.add_space(8.0);
+                                        egui::Frame::none()
+                                            .fill(theme::get_card_bg_color(dark_mode))
+                                            .rounding(theme::CARD_ROUNDING)
+                                            .stroke(egui::Stroke::new(1.0, theme::get_border_color(dark_mode)))
+                                            .inner_margin(20.0) // 充足内边距
+                                            .show(ui, |ui| {
+                                                ui.set_width(ui.available_width());
+                                                ui.vertical(|ui| {
+                                                    // 1. 外网出口
+                                                    ui.horizontal(|ui| {
+                                                        ui.add_sized([100.0, 24.0], egui::Label::new("🌎 外网出口:"));
+                                                        ComboBox::from_id_salt("ext")
+                                                            .width(ui.available_width() - 4.0)
+                                                            .selected_text(self.external_adapter_idx.map(|i| self.all_adapters[i].name.as_str()).unwrap_or("未选择"))
+                                                            .show_ui(ui, |ui| {
+                                                                for (i, a) in self.all_adapters.iter().enumerate() {
+                                                                    ui.selectable_value(&mut self.external_adapter_idx, Some(i), format!("{} ({})", a.name, a.ip));
+                                                                }
+                                                            });
+                                                    });
+                                                    ui.add_space(10.0);
+
+                                                    // 2. 内网网段
+                                                    ui.horizontal(|ui| {
+                                                        ui.add_sized([100.0, 24.0], egui::Label::new("🏢 内网网段:"));
+                                                        ComboBox::from_id_salt("int")
+                                                            .width(ui.available_width() - 4.0)
+                                                            .selected_text(self.internal_adapter_idx.map(|i| self.all_adapters[i].name.as_str()).unwrap_or("未选择"))
+                                                            .show_ui(ui, |ui| {
+                                                                for (i, a) in self.all_adapters.iter().enumerate() {
+                                                                    ui.selectable_value(&mut self.internal_adapter_idx, Some(i), format!("{} ({})", a.name, a.ip));
+                                                                }
+                                                            });
+                                                    });
+                                                    ui.add_space(10.0);
+
+                                                    // 3. 目标地址
+                                                    ui.horizontal(|ui| {
+                                                        ui.add_sized([100.0, 24.0], egui::Label::new("🎯 目标地址:"));
+                                                        ui.horizontal(|ui| {
+                                                            let ip_box_width = ((ui.available_width() - 24.0) / 2.0).max(100.0);
+                                                            ui.add(egui::TextEdit::singleline(&mut self.target_dest).desired_width(ip_box_width));
+                                                            ui.label(
+                                                                RichText::new("/")
+                                                                    .color(theme::get_secondary_text_color(dark_mode))
+                                                                    .strong(),
+                                                            );
+                                                            ui.add(egui::TextEdit::singleline(&mut self.target_mask).desired_width(ip_box_width));
+                                                        });
+                                                    });
+                                                });
+                                            });
+                                        ui.add_space(32.0);
+
+                                        // 4. 指南与日志
+                                        cheatsheet::render_cheatsheet(ui, &mut self.cheatsheet_state, &self.target_dest);
+                                        ui.add_space(24.0);
+                                        log_panel::render_log_panel(ui, &self.log_manager);
+                                        ui.add_space(40.0);
+                                    });
+                                });
                             });
                     });
-            });
     }
 }

@@ -103,21 +103,21 @@ pub fn render_log_panel(ui: &mut Ui, log_manager: &LogManager) {
     ui.label(
         RichText::new("📜 执行日志")
             .color(text_color)
-            .size(16.0)
+            .size(theme::FONT_SIZE_SUBTITLE)
             .strong(),
     );
-    ui.add_space(4.0);
+    ui.add_space(6.0);
 
     egui::Frame::none()
-        .fill(ui.visuals().extreme_bg_color)
-        .rounding(10.0)
+        .fill(theme::get_card_soft_color(dark_mode))
+        .rounding(theme::CARD_ROUNDING)
         .stroke(egui::Stroke::new(1.0, theme::get_border_color(dark_mode)))
-        .inner_margin(10.0)
+        .inner_margin(12.0)
         .show(ui, |ui| {
             ui.set_width(ui.available_width()); // 关键配置
 
             ScrollArea::vertical()
-                .max_height(200.0)
+                .max_height(180.0)
                 .stick_to_bottom(true)
                 .show(ui, |ui| {
                     ui.set_width(ui.available_width()); // 关键配置
@@ -126,7 +126,7 @@ pub fn render_log_panel(ui: &mut Ui, log_manager: &LogManager) {
                         ui.label(
                             RichText::new("暂无日志...")
                                 .color(secondary_color)
-                                .size(12.0),
+                                .size(theme::FONT_SIZE_SMALL),
                         );
                     } else {
                         for entry in log_manager.entries() {
@@ -134,14 +134,14 @@ pub fn render_log_panel(ui: &mut Ui, log_manager: &LogManager) {
                                 ui.label(
                                     RichText::new(format!("[{}]", entry.timestamp))
                                         .color(secondary_color)
-                                        .size(11.0)
+                                        .size(theme::FONT_SIZE_SMALL)
                                         .family(egui::FontFamily::Monospace),
                                 );
 
                                 ui.label(
                                     RichText::new(format!("[{}]", entry.level.label()))
                                         .color(entry.level.color(dark_mode))
-                                        .size(11.0)
+                                        .size(theme::FONT_SIZE_SMALL)
                                         .strong()
                                         .family(egui::FontFamily::Monospace),
                                 );
@@ -149,7 +149,7 @@ pub fn render_log_panel(ui: &mut Ui, log_manager: &LogManager) {
                                 ui.label(
                                     RichText::new(&entry.message)
                                         .color(entry.level.color(dark_mode))
-                                        .size(11.0)
+                                        .size(theme::FONT_SIZE_SMALL)
                                         .family(egui::FontFamily::Monospace),
                                 );
                             });
